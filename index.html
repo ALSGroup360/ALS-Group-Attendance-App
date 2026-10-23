@@ -49,10 +49,39 @@ a{color:var(--link);font-weight:500}
  <div class="card">
   <span class="eyebrow">Team access</span>
   <h1>Daily <em>attendance</em></h1>
-  <p class="mu">Sign in with the email and password from your admin.</p>
-  <input id="em" type="email" placeholder="Email" autocomplete="username">
+  <p class="mu" id="lsub">Sign in with your work email and password.</p>
+  <input id="nm" placeholder="Full name" autocomplete="name" hidden>
+  <input id="em" type="email" placeholder="Work email" autocomplete="username">
   <input id="pw" type="password" placeholder="Password" autocomplete="current-password">
-  <button id="btnLogin">Sign in</button><div id="lmsg" class="mu"></div>
+  <button id="btnLogin">Sign in</button>
+  <button class="ghost" id="toggle">New here? Create an account</button>
+  <p class="mu" style="margin:12px 0 0"><a href="#" id="forgot">Forgot password?</a></p>
+  <div id="lmsg" class="mu"></div>
+ </div>
+</div>
+
+<div id="verify" hidden>
+ <div class="top"><span class="tile"><img src="logo.png" alt="ALS Affinity Liaison Service"></span></div>
+ <div class="card">
+  <span class="eyebrow">One step left</span>
+  <h1>Verify your <em>email</em></h1>
+  <p class="mu">We sent a link to <b id="vmail"></b>. Open it, then come back and tap the button below. Check spam if you do not see it.</p>
+  <button id="vdone">I have verified</button>
+  <button class="ghost" id="vresend">Send email again</button>
+  <button class="ghost" id="vout">Sign out</button>
+  <div id="vmsg" class="mu"></div>
+ </div>
+</div>
+
+<div id="pending" hidden>
+ <div class="top"><span class="tile"><img src="logo.png" alt="ALS Affinity Liaison Service"></span></div>
+ <div class="card">
+  <span class="eyebrow">Almost there</span>
+  <h1>Waiting for <em>approval</em></h1>
+  <p class="mu">Your account is ready. An admin needs to approve it before you can mark attendance.</p>
+  <button id="pcheck">Check again</button>
+  <button class="ghost" id="pout">Sign out</button>
+  <div id="pmsg" class="mu"></div>
  </div>
 </div>
 
@@ -69,6 +98,9 @@ a{color:var(--link);font-weight:500}
  <div id="admin" hidden>
   <div class="card"><b>All staff</b><input id="adate" type="date"><button id="btnLoad">Load</button><button id="btnCsv" class="ghost">Download CSV</button>
    <div class="tw"><table id="atable"></table></div></div>
+  <div class="card"><b>Staff access</b><p class="mu">New sign ups wait here until you approve them.</p>
+   <div id="pend"></div>
+   <button class="ghost" id="btnStaff">Show approved staff</button><div id="appr"></div></div>
   <div class="card"><b>Monthly and yearly reports</b>
    <input id="rmonth" type="month"><button id="btnMonth">Monthly report</button>
    <input id="ryear" type="number" min="2024" max="2100" placeholder="Year"><button id="btnYear">Yearly report</button>
@@ -82,8 +114,8 @@ a{color:var(--link);font-weight:500}
 
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getAuth,signInWithEmailAndPassword,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,collection,addDoc,query,where,getDocs,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendEmailVerification,sendPasswordResetEmail,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,collection,addDoc,query,where,getDocs,serverTimestamp,doc,getDoc,setDoc,updateDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // 1) PASTE YOUR FIREBASE CONFIG HERE
 const firebaseConfig = {
@@ -104,25 +136,75 @@ let user=null, adminRows=[];
 
 setInterval(()=>{const n=new Date();$("clock").textContent=n.toLocaleTimeString();$("dt").textContent=n.toDateString()},1000);
 
+let mode="in";
+const isAdminEmail=e=>ADMIN_EMAILS.includes((e||"").toLowerCase());
+function show(w){["login","verify","pending","app"].forEach(k=>$(k).hidden=k!==w)}
+const errMsg=e=>({"auth/email-already-in-use":"This email already has an account. Sign in instead.","auth/weak-password":"Password is too weak. Use at least 8 characters.","auth/invalid-credential":"Wrong email or password.","auth/invalid-email":"That email does not look right.","auth/too-many-requests":"Too many tries. Wait a few minutes and try again.","auth/network-request-failed":"No internet. Try again."}[e.code]||("Something went wrong ("+(e.code||e.message)+")"));
+$("toggle").onclick=()=>{mode=mode==="in"?"up":"in";const up=mode==="up";
+  $("nm").hidden=!up;$("btnLogin").textContent=up?"Create account":"Sign in";
+  $("toggle").textContent=up?"Already have an account? Sign in":"New here? Create an account";
+  $("lsub").textContent=up?"Use your @alsgroups.com email. You will verify it, then an admin approves you.":"Sign in with your work email and password.";
+  $("pw").autocomplete=up?"new-password":"current-password";$("lmsg").textContent=""};
 $("btnLogin").onclick=async()=>{
-  $("lmsg").textContent="Signing in...";
-  try{await signInWithEmailAndPassword(auth,$("em").value.trim(),$("pw").value)}
-  catch(e){$("lmsg").textContent="Login failed. Check email and password."}
+  const email=$("em").value.trim().toLowerCase(),pw=$("pw").value,m=$("lmsg");
+  if(!email||!pw){m.textContent="Enter your email and password.";return}
+  m.textContent=mode==="up"?"Creating account...":"Signing in...";
+  try{
+    if(mode==="up"){
+      const nm=$("nm").value.trim();
+      if(!nm){m.textContent="Enter your full name.";return}
+      if(!/^[^@\s]+@alsgroups\.com$/.test(email)){m.textContent="Use your @alsgroups.com email.";return}
+      if(pw.length<8){m.textContent="Password must be at least 8 characters.";return}
+      const c=await createUserWithEmailAndPassword(auth,email,pw);
+      try{localStorage.setItem("als_name_"+c.user.uid,nm)}catch(e){}
+      await sendEmailVerification(c.user);
+    }else{await signInWithEmailAndPassword(auth,email,pw)}
+    m.textContent="";
+  }catch(e){m.textContent=errMsg(e)}
 };
-$("btnLogout").onclick=()=>signOut(auth);
+$("forgot").onclick=async ev=>{ev.preventDefault();const email=$("em").value.trim();
+  if(!email){$("lmsg").textContent="Type your email above first, then tap Forgot password.";return}
+  try{await sendPasswordResetEmail(auth,email);$("lmsg").textContent="Reset link sent. Check your inbox and spam."}catch(e){$("lmsg").textContent=errMsg(e)}};
+$("btnLogout").onclick=$("vout").onclick=$("pout").onclick=()=>signOut(auth);
+$("vdone").onclick=$("pcheck").onclick=()=>location.reload();
+$("vresend").onclick=async()=>{try{await sendEmailVerification(user);$("vmsg").textContent="Sent again. Check inbox and spam."}catch(e){$("vmsg").textContent=errMsg(e)}};
 
-onAuthStateChanged(auth,u=>{
-  user=u; $("login").hidden=!!u; $("app").hidden=!u;
-  if(u){$("who").textContent=u.email;$("tabAdmin").hidden=!ADMIN_EMAILS.includes((u.email||"").toLowerCase());
-        $("adate").value=dayStr(new Date());$("rmonth").value=dayStr(new Date()).slice(0,7);$("ryear").value=new Date().getFullYear();loadToday()}
+
+onAuthStateChanged(auth,async u=>{
+  user=u;
+  if(!u){show("login");return}
+  const admin=isAdminEmail(u.email);
+  if(!admin){
+    if(!u.emailVerified){$("vmail").textContent=u.email;show("verify");return}
+    try{
+      const ref=doc(db,"users",u.uid);let d=await getDoc(ref);
+      if(!d.exists()){
+        let nm="";try{nm=localStorage.getItem("als_name_"+u.uid)||""}catch(e){}
+        await setDoc(ref,{email:u.email,name:nm||u.email.split("@")[0],approved:false,createdAt:serverTimestamp()});
+        d=await getDoc(ref);
+      }
+      if(!d.data().approved){show("pending");return}
+    }catch(e){$("pmsg").textContent="Could not check approval ("+(e.code||e.message)+").";show("pending");return}
+  }
+  $("who").textContent=u.email;$("tabAdmin").hidden=!admin;
+  $("adate").value=dayStr(new Date());$("rmonth").value=dayStr(new Date()).slice(0,7);$("ryear").value=new Date().getFullYear();
+  loadToday();show("app");
 });
 $("tabMe").onclick=()=>{$("me").hidden=false;$("admin").hidden=true;$("tabMe").classList.add("on");$("tabAdmin").classList.remove("on")};
-$("tabAdmin").onclick=()=>{$("me").hidden=true;$("admin").hidden=false;$("tabAdmin").classList.add("on");$("tabMe").classList.remove("on");loadAdmin()};
+$("tabAdmin").onclick=()=>{$("me").hidden=true;$("admin").hidden=false;$("tabAdmin").classList.add("on");$("tabMe").classList.remove("on");loadAdmin();loadStaff()};
 
-function getPos(){return new Promise((res,rej)=>{
-  if(!navigator.geolocation)return rej(new Error("Location not supported on this device."));
-  navigator.geolocation.getCurrentPosition(res,e=>rej(new Error(e.code===1?"Location permission denied. Please allow location for this site.":"Could not get location. Try again outdoors or near a window.")),{enableHighAccuracy:true,timeout:20000,maximumAge:0});
-})}
+async function getPos(){
+  if(!navigator.geolocation)throw new Error("Location not supported on this device.");
+  const once=o=>new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,o));
+  const fail=e=>new Error(e&&e.code===1?"Location permission denied. Please allow location for this site.":"Could not get location. Check that Location is on, then try again.");
+  let quick=null;
+  // 1) Fast try: network or recent location, usually under 2 seconds
+  try{quick=await once({enableHighAccuracy:false,timeout:6000,maximumAge:120000});
+      if(quick.coords.accuracy<=150)return quick}catch(e){if(e.code===1)throw fail(e)}
+  // 2) Fall back to a fresh GPS fix, but do not wait long
+  try{return await once({enableHighAccuracy:true,timeout:12000,maximumAge:0})}
+  catch(e){if(quick)return quick;throw fail(e)}
+}
 
 async function mark(type){
   const m=$("msg");$("btnIn").disabled=$("btnOut").disabled=true;m.textContent="Getting your location...";
@@ -185,5 +267,17 @@ $("btnYear").onclick=async()=>{
 $("btnRCsv").onclick=()=>{if(!reportRows.length)return;
   const csv=reportRows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(",")).join("\n");
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="attendance-report.csv";a.click()};
+
+const smallBtn='style="width:auto;padding:8px 14px;margin:0"';
+async function loadStaff(){
+  const p=await getDocs(query(collection(db,"users"),where("approved","==",false)));
+  $("pend").innerHTML=p.docs.length?p.docs.map(d=>{const x=d.data();return `<div class="log"><span>${esc(x.name)}<br><span class="mu">${esc(x.email)}</span></span><button data-ap="${d.id}" ${smallBtn}>Approve</button></div>`}).join(""):'<p class="mu">No one is waiting.</p>';
+  document.querySelectorAll("[data-ap]").forEach(b=>b.onclick=async()=>{b.disabled=true;try{await updateDoc(doc(db,"users",b.dataset.ap),{approved:true})}catch(e){}loadStaff()});
+}
+$("btnStaff").onclick=async()=>{
+  const p=await getDocs(query(collection(db,"users"),where("approved","==",true)));
+  $("appr").innerHTML=p.docs.length?p.docs.map(d=>{const x=d.data();return `<div class="log"><span>${esc(x.name)}<br><span class="mu">${esc(x.email)}</span></span><button class="ghost" data-rm="${d.id}" ${smallBtn}>Remove access</button></div>`}).join(""):'<p class="mu">No approved staff yet.</p>';
+  document.querySelectorAll("[data-rm]").forEach(b=>b.onclick=async()=>{b.disabled=true;try{await updateDoc(doc(db,"users",b.dataset.rm),{approved:false})}catch(e){}$("btnStaff").onclick();loadStaff()});
+};
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script></body></html>
