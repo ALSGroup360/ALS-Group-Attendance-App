@@ -193,28 +193,33 @@ onAuthStateChanged(auth,async u=>{
 $("tabMe").onclick=()=>{$("me").hidden=false;$("admin").hidden=true;$("tabMe").classList.add("on");$("tabAdmin").classList.remove("on")};
 $("tabAdmin").onclick=()=>{$("me").hidden=true;$("admin").hidden=false;$("tabAdmin").classList.add("on");$("tabMe").classList.remove("on");loadAdmin();loadStaff()};
 
-async function getPos(){
-  if(!navigator.geolocation)throw new Error("Location not supported on this device.");
-  const once=o=>new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,o));
-  const fail=e=>new Error(e&&e.code===1?"Location permission denied. Please allow location for this site.":"Could not get location. Check that Location is on, then try again.");
-  let quick=null;
-  // 1) Fast try: network or recent location, usually under 2 seconds
-  try{quick=await once({enableHighAccuracy:false,timeout:6000,maximumAge:120000});
-      if(quick.coords.accuracy<=150)return quick}catch(e){if(e.code===1)throw fail(e)}
-  // 2) Fall back to a fresh GPS fix, but do not wait long
-  try{return await once({enableHighAccuracy:true,timeout:12000,maximumAge:0})}
-  catch(e){if(quick)return quick;throw fail(e)}
+function getPos(onTick){
+  return new Promise((resolve,reject)=>{
+    if(!navigator.geolocation)return reject(new Error("Location not supported on this device."));
+    let best=null,done=false,wid=null;const t0=Date.now();
+    const fail=e=>new Error(e&&e.code===1?"Location permission denied. Allow location for this site in your phone or browser settings.":"Could not get your location. Turn Location on, move near a window or go outside, then try again.");
+    const finish=(p,err)=>{if(done)return;done=true;clearInterval(tick);clearTimeout(soft);clearTimeout(hard);
+      if(wid!==null)navigator.geolocation.clearWatch(wid);p?resolve(p):reject(err)};
+    const consider=p=>{if(!best||p.coords.accuracy<best.coords.accuracy)best=p;if(p.coords.accuracy<=100)finish(best)};
+    const onErr=e=>{if(e.code===1)finish(null,fail(e))};
+    // Race a quick network/recent fix against a fresh GPS fix; whichever is good first wins
+    navigator.geolocation.getCurrentPosition(consider,onErr,{enableHighAccuracy:false,timeout:15000,maximumAge:120000});
+    wid=navigator.geolocation.watchPosition(consider,onErr,{enableHighAccuracy:true,timeout:15000,maximumAge:0});
+    const soft=setTimeout(()=>{if(best)finish(best)},6000);
+    const hard=setTimeout(()=>finish(best,best?null:fail()),15000);
+    const tick=setInterval(()=>onTick&&onTick(Math.round((Date.now()-t0)/1000)),1000);
+  });
 }
 
 async function mark(type){
   const m=$("msg");$("btnIn").disabled=$("btnOut").disabled=true;m.textContent="Getting your location...";
   try{
-    const p=await getPos();
+    const p=await getPos(sec=>{m.textContent="Getting your location... "+sec+"s"});m.textContent="Saving...";
     await addDoc(collection(db,"attendance"),{
       uid:user.uid,email:user.email,type,day:dayStr(new Date()),
       lat:p.coords.latitude,lng:p.coords.longitude,accuracy:Math.round(p.coords.accuracy),
       ts:serverTimestamp()});
-    m.textContent=(type==="in"?"Time In":"Time Out")+" recorded.";await loadToday();
+    m.textContent=(type==="in"?"Time In":"Time Out")+" recorded. Location accuracy about "+Math.round(p.coords.accuracy)+" m.";await loadToday();
   }catch(e){m.textContent=e.message}
   $("btnIn").disabled=$("btnOut").disabled=false;
 }
