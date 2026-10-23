@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /attendance/{id} {
+      // Staff can only create their own records, with server time
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.ts == request.time;
+      // Staff read their own; admin reads all (change the email)
+      allow read: if request.auth != null
+        && (resource.data.uid == request.auth.uid
+            || request.auth.token.email in ['saqib.ali@alsgroups.com','seema.arif@alsgroups.com']);
+      allow update, delete: if false;
+    }
+  }
+}

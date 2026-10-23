@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ALS Attendance</title>
+<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#2E2D2B">
+<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;800&family=Inter:wght@400;500&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
+<style>
+/* ALS Brand Guidelines v1.2: Silver bg, Graphite ink, Amber accent */
+:root{--bg:#CCCCCC;--card:#FFFFFF;--tx:#2E2D2B;--mu:#4A4845;--amber:#E5A00D;--gr:#2E2D2B;--sand:#F2F0EA;--bd:#D9D4C7;--link:#2E2D2B}
+@media(prefers-color-scheme:dark){:root{--bg:#1E1D1B;--card:#2E2D2B;--tx:#F2F0EA;--mu:#D9D4C7;--bd:#4A4845;--link:#E5A00D}}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,Arial,Calibri,sans-serif;background:var(--bg);color:var(--tx);line-height:1.6}
+.wrap{max-width:480px;margin:0 auto;padding:20px 16px 32px}
+.tile{display:inline-block;background:#fff;border-radius:16px;padding:10px 14px;line-height:0}
+.tile img{height:56px;width:auto}
+.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.eyebrow{display:inline-block;background:var(--amber);color:#2E2D2B;font:600 12px Sora,Arial,sans-serif;letter-spacing:.2em;text-transform:uppercase;padding:6px 10px}
+h1{font:800 28px/1.1 Sora,Arial,sans-serif;text-transform:uppercase;letter-spacing:-.02em;margin:10px 0 4px}
+h1 em{font:italic 400 1.25em "Instrument Serif",Georgia,serif;text-transform:none;letter-spacing:0}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:18px;padding:18px;margin-bottom:14px}
+.mu{color:var(--mu);font-size:14px}
+b{font-family:Sora,Arial,sans-serif;font-weight:600}
+input{width:100%;padding:13px;margin:6px 0;border:1px solid var(--bd);border-radius:14px;background:var(--sand);color:#2E2D2B;font:16px Inter,Arial,sans-serif}
+button{width:100%;padding:15px;border:0;border-radius:14px;font:600 16px Sora,Arial,sans-serif;background:var(--amber);color:#2E2D2B;margin-top:8px;cursor:pointer}
+button.out{background:#2E2D2B;color:#fff}
+@media(prefers-color-scheme:dark){button.out{background:#F2F0EA;color:#1E1D1B}}
+button.ghost{background:transparent;color:var(--tx);border:1.5px solid var(--tx);font-weight:600}
+button:disabled{opacity:.5}.row{display:flex;gap:10px}
+.hero{background:#1E1D1B;color:#F2F0EA;border:0;background-image:radial-gradient(circle at 85% 0%,rgba(229,160,13,.35),rgba(30,29,27,0) 60%)}
+.hero .mu{color:#D9D4C7}
+#clock{font:800 40px/1.1 Sora,Arial,sans-serif;margin:8px 0 2px;letter-spacing:-.02em}
+.hero em{font:italic 400 22px "Instrument Serif",Georgia,serif;color:#E5A00D}
+.log{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-top:1px solid var(--bd);font-size:15px}
+.pill{display:inline-block;font:600 12px Sora,Arial,sans-serif;padding:4px 10px;border-radius:99px;background:var(--amber);color:#2E2D2B;margin-right:8px}
+.pill.o{background:transparent;border:1.5px solid var(--tx);color:var(--tx)}
+a{color:var(--link);font-weight:500}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tabs button{margin:0;padding:10px;border-radius:99px;font-size:13px;background:transparent;color:var(--tx);border:1.5px solid var(--tx)}
+.tabs button.on{background:var(--amber);color:#2E2D2B;border-color:var(--amber)}
+.tw{overflow-x:auto}table{border-collapse:collapse;font-size:13px;width:100%}td,th{padding:7px 8px;border-bottom:1px solid var(--bd);text-align:left;white-space:nowrap}
+#msg{min-height:22px;font-size:14px;margin-top:10px}
+.foot{text-align:center;font-size:12px;color:var(--mu);margin-top:18px}
+</style></head><body><div class="wrap">
+
+<div id="login" hidden>
+ <div class="top"><span class="tile"><img src="logo.png" alt="ALS Affinity Liaison Service"></span></div>
+ <div class="card">
+  <span class="eyebrow">Team access</span>
+  <h1>Daily <em>attendance</em></h1>
+  <p class="mu">Sign in with the email and password from your admin.</p>
+  <input id="em" type="email" placeholder="Email" autocomplete="username">
+  <input id="pw" type="password" placeholder="Password" autocomplete="current-password">
+  <button id="btnLogin">Sign in</button><div id="lmsg" class="mu"></div>
+ </div>
+</div>
+
+<div id="app" hidden>
+ <div class="top"><span class="tile"><img src="logo.png" alt="ALS Affinity Liaison Service"></span><span class="pill o">Team</span></div>
+ <div class="tabs"><button id="tabMe" class="on">My attendance</button><button id="tabAdmin" hidden>Admin</button></div>
+ <div id="me">
+  <div class="card hero"><div class="mu" id="who"></div><div id="clock"></div><div class="mu" id="dt"></div>
+   <p style="margin:10px 0 0"><em>mark your day</em></p>
+   <div class="row"><button id="btnIn">Time In</button><button id="btnOut" class="out" style="background:#F2F0EA;color:#1E1D1B">Time Out</button></div>
+   <div id="msg"></div></div>
+  <div class="card"><b>Today</b><div id="today"></div></div>
+ </div>
+ <div id="admin" hidden>
+  <div class="card"><b>All staff</b><input id="adate" type="date"><button id="btnLoad">Load</button><button id="btnCsv" class="ghost">Download CSV</button>
+   <div class="tw"><table id="atable"></table></div></div>
+  <div class="card"><b>Monthly and yearly reports</b>
+   <input id="rmonth" type="month"><button id="btnMonth">Monthly report</button>
+   <input id="ryear" type="number" min="2024" max="2100" placeholder="Year"><button id="btnYear">Yearly report</button>
+   <button id="btnRCsv" class="ghost">Download report CSV</button>
+   <p class="mu">Hours are counted from each Time In to the next Time Out. Days with no Time Out are flagged.</p>
+   <div class="tw"><table id="rtable"></table></div></div>
+ </div>
+ <button class="ghost" id="btnLogout">Sign out</button>
+ <div class="foot">ALS · alsgroups.com</div>
+</div></div>
+
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,signInWithEmailAndPassword,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,collection,addDoc,query,where,getDocs,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// 1) PASTE YOUR FIREBASE CONFIG HERE
+const firebaseConfig = {
+  apiKey: "AIzaSyBVM1vXCmKm9VXCHlm8182MMekxF0lNw0A",
+  authDomain: "als-group-attendance-app.firebaseapp.com",
+  projectId: "als-group-attendance-app",
+  appId: "1:998678589420:web:83128e31ee4213a94a9ac9"
+};
+// 2) ADMIN EMAILS (must match the emails in firestore.rules)
+const ADMIN_EMAILS = ["saqib.ali@alsgroups.com","seema.arif@alsgroups.com"];
+
+const app=initializeApp(firebaseConfig), auth=getAuth(app), db=getFirestore(app);
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const dayStr=d=>{const p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())};
+const fmt=t=>t?t.toDate().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}):"";
+let user=null, adminRows=[];
+
+setInterval(()=>{const n=new Date();$("clock").textContent=n.toLocaleTimeString();$("dt").textContent=n.toDateString()},1000);
+
+$("btnLogin").onclick=async()=>{
+  $("lmsg").textContent="Signing in...";
+  try{await signInWithEmailAndPassword(auth,$("em").value.trim(),$("pw").value)}
+  catch(e){$("lmsg").textContent="Login failed. Check email and password."}
+};
+$("btnLogout").onclick=()=>signOut(auth);
+
+onAuthStateChanged(auth,u=>{
+  user=u; $("login").hidden=!!u; $("app").hidden=!u;
+  if(u){$("who").textContent=u.email;$("tabAdmin").hidden=!ADMIN_EMAILS.includes((u.email||"").toLowerCase());
+        $("adate").value=dayStr(new Date());$("rmonth").value=dayStr(new Date()).slice(0,7);$("ryear").value=new Date().getFullYear();loadToday()}
+});
+$("tabMe").onclick=()=>{$("me").hidden=false;$("admin").hidden=true;$("tabMe").classList.add("on");$("tabAdmin").classList.remove("on")};
+$("tabAdmin").onclick=()=>{$("me").hidden=true;$("admin").hidden=false;$("tabAdmin").classList.add("on");$("tabMe").classList.remove("on");loadAdmin()};
+
+function getPos(){return new Promise((res,rej)=>{
+  if(!navigator.geolocation)return rej(new Error("Location not supported on this device."));
+  navigator.geolocation.getCurrentPosition(res,e=>rej(new Error(e.code===1?"Location permission denied. Please allow location for this site.":"Could not get location. Try again outdoors or near a window.")),{enableHighAccuracy:true,timeout:20000,maximumAge:0});
+})}
+
+async function mark(type){
+  const m=$("msg");$("btnIn").disabled=$("btnOut").disabled=true;m.textContent="Getting your location...";
+  try{
+    const p=await getPos();
+    await addDoc(collection(db,"attendance"),{
+      uid:user.uid,email:user.email,type,day:dayStr(new Date()),
+      lat:p.coords.latitude,lng:p.coords.longitude,accuracy:Math.round(p.coords.accuracy),
+      ts:serverTimestamp()});
+    m.textContent=(type==="in"?"Time In":"Time Out")+" recorded.";await loadToday();
+  }catch(e){m.textContent=e.message}
+  $("btnIn").disabled=$("btnOut").disabled=false;
+}
+$("btnIn").onclick=()=>mark("in");$("btnOut").onclick=()=>mark("out");
+
+const mapLink=r=>`https://www.google.com/maps?q=${r.lat},${r.lng}`;
+async function loadToday(){
+  const s=await getDocs(query(collection(db,"attendance"),where("uid","==",user.uid),where("day","==",dayStr(new Date()))));
+  const rows=s.docs.map(d=>d.data()).filter(r=>r.ts).sort((a,b)=>a.ts.seconds-b.ts.seconds);
+  $("today").innerHTML=rows.length?rows.map(r=>`<div class="log"><span>${r.type==="in"?"Time In":"Time Out"} at ${fmt(r.ts)}</span><a target="_blank" rel="noopener" href="${mapLink(r)}">Map</a></div>`).join(""):'<p class="mu">No entries yet today.</p>';
+}
+async function loadAdmin(){
+  const d=$("adate").value||dayStr(new Date());
+  const s=await getDocs(query(collection(db,"attendance"),where("day","==",d)));
+  adminRows=s.docs.map(x=>x.data()).filter(r=>r.ts).sort((a,b)=>a.email.localeCompare(b.email)||a.ts.seconds-b.ts.seconds);
+  $("atable").innerHTML="<tr><th>Staff</th><th>Type</th><th>Time</th><th>Acc (m)</th><th>Map</th></tr>"+
+   adminRows.map(r=>`<tr><td>${esc(r.email)}</td><td>${r.type}</td><td>${fmt(r.ts)}</td><td>${r.accuracy}</td><td><a target="_blank" rel="noopener" href="${mapLink(r)}">Open</a></td></tr>`).join("");
+}
+$("btnLoad").onclick=loadAdmin;
+$("btnCsv").onclick=()=>{
+  const lines=["email,type,date,time,lat,lng,accuracy_m"].concat(adminRows.map(r=>[r.email,r.type,r.day,fmt(r.ts),r.lat,r.lng,r.accuracy].join(",")));
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/csv"}));a.download="attendance-"+$("adate").value+".csv";a.click();
+};
+
+let reportRows=[];
+const hh=s=>(s/3600).toFixed(1);
+async function fetchRange(a,b){const s=await getDocs(query(collection(db,"attendance"),where("day",">=",a),where("day","<=",b)));return s.docs.map(d=>d.data()).filter(r=>r.ts)}
+function group(rows){const m={};rows.forEach(r=>{((m[r.email]??={})[r.day]??=[]).push(r)});
+  for(const e in m)for(const d in m[e])m[e][d].sort((x,y)=>x.ts.seconds-y.ts.seconds);return m}
+function dayHours(list){let sec=0,open=null,miss=false;
+  for(const r of list){if(r.type==="in"){if(open!==null)miss=true;open=r.ts.seconds}else if(open!==null){sec+=r.ts.seconds-open;open=null}}
+  if(open!==null)miss=true;return {sec,miss}}
+function showReport(){$("rtable").innerHTML=reportRows.map((r,i)=>"<tr>"+r.map(c=>i?`<td>${esc(c)}</td>`:`<th>${esc(c)}</th>`).join("")+"</tr>").join("")}
+$("btnMonth").onclick=async()=>{
+  const v=$("rmonth").value;if(!v)return;$("rtable").innerHTML="<tr><td>Loading...</td></tr>";
+  const g=group(await fetchRange(v+"-01",v+"-31"));
+  reportRows=[["Staff","Days present","Hours","Days missing Time Out"]];
+  Object.keys(g).sort().forEach(e=>{let sec=0,miss=0;const days=Object.keys(g[e]);
+    days.forEach(d=>{const h=dayHours(g[e][d]);sec+=h.sec;if(h.miss)miss++});
+    reportRows.push([e,days.length,hh(sec),miss])});
+  if(reportRows.length===1)reportRows.push(["No records for this month","","",""]);showReport()};
+$("btnYear").onclick=async()=>{
+  const y=$("ryear").value;if(!y)return;$("rtable").innerHTML="<tr><td>Loading...</td></tr>";
+  const g=group(await fetchRange(y+"-01-01",y+"-12-31"));
+  reportRows=[["Staff","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Total days","Hours"]];
+  Object.keys(g).sort().forEach(e=>{const mc=Array(12).fill(0);let sec=0,tot=0;
+    Object.keys(g[e]).forEach(d=>{mc[+d.slice(5,7)-1]++;tot++;sec+=dayHours(g[e][d]).sec});
+    reportRows.push([e,...mc,tot,hh(sec)])});
+  if(reportRows.length===1)reportRows.push(["No records for this year"]);showReport()};
+$("btnRCsv").onclick=()=>{if(!reportRows.length)return;
+  const csv=reportRows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(",")).join("\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="attendance-report.csv";a.click()};
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script></body></html>
