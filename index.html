@@ -49,9 +49,9 @@ a{color:var(--link);font-weight:500}
  <div class="card">
   <span class="eyebrow">Team access</span>
   <h1>Daily <em>attendance</em></h1>
-  <p class="mu" id="lsub">Sign in with your work email and password.</p>
+  <p class="mu" id="lsub">Sign in with your email and password.</p>
   <input id="nm" placeholder="Full name" autocomplete="name" hidden>
-  <input id="em" type="email" placeholder="Work email" autocomplete="username">
+  <input id="em" type="email" placeholder="Email" autocomplete="username">
   <input id="pw" type="password" placeholder="Password" autocomplete="current-password">
   <button id="btnLogin">Sign in</button>
   <button class="ghost" id="toggle">New here? Create an account</button>
@@ -143,7 +143,7 @@ const errMsg=e=>({"auth/email-already-in-use":"This email already has an account
 $("toggle").onclick=()=>{mode=mode==="in"?"up":"in";const up=mode==="up";
   $("nm").hidden=!up;$("btnLogin").textContent=up?"Create account":"Sign in";
   $("toggle").textContent=up?"Already have an account? Sign in":"New here? Create an account";
-  $("lsub").textContent=up?"Use your @alsgroups.com email. You will verify it, then an admin approves you.":"Sign in with your work email and password.";
+  $("lsub").textContent=up?"Use any email you can open (Gmail is fine). You verify it, then an admin approves you.":"Sign in with your email and password.";
   $("pw").autocomplete=up?"new-password":"current-password";$("lmsg").textContent=""};
 $("btnLogin").onclick=async()=>{
   const email=$("em").value.trim().toLowerCase(),pw=$("pw").value,m=$("lmsg");
@@ -153,7 +153,7 @@ $("btnLogin").onclick=async()=>{
     if(mode==="up"){
       const nm=$("nm").value.trim();
       if(!nm){m.textContent="Enter your full name.";return}
-      if(!/^[^@\s]+@alsgroups\.com$/.test(email)){m.textContent="Use your @alsgroups.com email.";return}
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){m.textContent="Enter a valid email address.";return}
       if(pw.length<8){m.textContent="Password must be at least 8 characters.";return}
       const c=await createUserWithEmailAndPassword(auth,email,pw);
       try{localStorage.setItem("als_name_"+c.user.uid,nm)}catch(e){}
